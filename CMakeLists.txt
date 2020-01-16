@@ -146,6 +146,10 @@ IF(CMAKE_COMPILER_IS_GNUCC)
   ENDFOREACH()
 ENDIF()
 
+IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+  ADD_DEFINITIONS(-D_GNU_SOURCE=1)
+ENDIF()
+
 # If the build type isn't specified, set to Relwithdebinfo as default.
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE "RelWithDebInfo")
