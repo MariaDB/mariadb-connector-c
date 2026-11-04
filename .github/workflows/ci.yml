@@ -170,6 +170,7 @@ jobs:
           registry-password: ${{ matrix.db-type == 'enterprise' && secrets.ENTERPRISE_TOKEN || secrets.DOCKER_TOKEN }}
           os: ${{ matrix.os }}
           maxscale-tag: ${{ matrix.maxscale-tag || ''}}
+          maxscale-license-key: ${{ secrets.MAXSCALE_LICENSE_KEY }}
 
       - name: make ubuntu/macos
         if: ${{ !startsWith(matrix.os, 'windows') }}
