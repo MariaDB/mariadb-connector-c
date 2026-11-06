@@ -385,50 +385,58 @@ net_field_length(uchar **packet)
 int net_field_length_ll_safe(uchar **pos, const uchar *end,
                              unsigned int flags, unsigned long long *len)
 {
-  uchar *p;
+  uchar *p= *pos;
   size_t avail;
 
   if (flags & ~(unsigned int)MARIADB_LENENC_FORBID_NULL)
     return MARIADB_LENENC_ERROR;
 
-  p= *pos;
   if (p >= end)
     return MARIADB_LENENC_ERROR;
 
+  /* 0..250: the byte is the value, by far the most common case */
+  if (*p < 251)
+  {
+    *len= (unsigned long long)*p;
+    *pos= p + 1;
+    return MARIADB_LENENC_OK;
+  }
+
   avail= (size_t)(end - p);       /* >= 1, includes the marker byte */
 
-  switch (*p) {
-  case 251:
+  if (*p == 251)
+  {
     if (flags & MARIADB_LENENC_FORBID_NULL)
       return MARIADB_LENENC_ERROR;
     *len= 0;
     *pos= p + 1;
     return MARIADB_LENENC_NULL;
-  case 252:
+  }
+  if (*p == 252)
+  {
     if (avail < 3)
       return MARIADB_LENENC_ERROR;
     *len= (unsigned long long)uint2korr(p + 1);
     *pos= p + 3;
     return MARIADB_LENENC_OK;
-  case 253:
+  }
+  if (*p == 253)
+  {
     if (avail < 4)
       return MARIADB_LENENC_ERROR;
     *len= (unsigned long long)uint3korr(p + 1);
     *pos= p + 4;
     return MARIADB_LENENC_OK;
-  case 254:
+  }
+  if (*p == 254)
+  {
     if (avail < 9)
       return MARIADB_LENENC_ERROR;
     *len= (unsigned long long)uint8korr(p + 1);
     *pos= p + 9;
     return MARIADB_LENENC_OK;
-  case 255:                       /* never a valid length marker */
-    return MARIADB_LENENC_ERROR;
-  default:                        /* 0..250: the byte is the value */
-    *len= (unsigned long long)*p;
-    *pos= p + 1;
-    return MARIADB_LENENC_OK;
   }
+  return MARIADB_LENENC_ERROR;    /* 255: never a valid length marker */
 }
 
 /*
@@ -440,15 +448,62 @@ int net_field_length_safe(uchar **pos, const uchar *end,
                           unsigned int flags, ulong *len)
 {
   uchar *p= *pos;
-  unsigned long long v= 0;
-  int rc= net_field_length_ll_safe(&p, end, flags, &v);
+  size_t avail;
 
-  if (rc == MARIADB_LENENC_ERROR || v > 0xFFFFFFFFULL)
+  if (flags & ~(unsigned int)MARIADB_LENENC_FORBID_NULL)
     return MARIADB_LENENC_ERROR;
 
-  *len= (ulong)v;
-  *pos= p;
-  return rc;                      /* MARIADB_LENENC_OK or _NULL */
+  if (p >= end)
+    return MARIADB_LENENC_ERROR;
+
+  /* 0..250: the byte is the value, by far the most common case */
+  if (*p < 251)
+  {
+    *len= (ulong)*p;
+    *pos= p + 1;
+    return MARIADB_LENENC_OK;
+  }
+
+  avail= (size_t)(end - p);       /* >= 1, includes the marker byte */
+
+  if (*p == 251)
+  {
+    if (flags & MARIADB_LENENC_FORBID_NULL)
+      return MARIADB_LENENC_ERROR;
+    *len= 0;
+    *pos= p + 1;
+    return MARIADB_LENENC_NULL;
+  }
+  if (*p == 252)
+  {
+    if (avail < 3)
+      return MARIADB_LENENC_ERROR;
+    *len= (ulong)uint2korr(p + 1);
+    *pos= p + 3;
+    return MARIADB_LENENC_OK;
+  }
+  if (*p == 253)
+  {
+    if (avail < 4)
+      return MARIADB_LENENC_ERROR;
+    *len= (ulong)uint3korr(p + 1);
+    *pos= p + 4;
+    return MARIADB_LENENC_OK;
+  }
+  if (*p == 254)
+  {
+    unsigned long long v;
+
+    if (avail < 9)
+      return MARIADB_LENENC_ERROR;
+    v= (unsigned long long)uint8korr(p + 1);
+    if (v > 0xFFFFFFFFULL)
+      return MARIADB_LENENC_ERROR;
+    *len= (ulong)v;
+    *pos= p + 9;
+    return MARIADB_LENENC_OK;
+  }
+  return MARIADB_LENENC_ERROR;    /* 255: never a valid length marker */
 }
 
 void free_rows(MYSQL_DATA *cur)
