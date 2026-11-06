@@ -2005,14 +2005,11 @@ my_bool mthd_stmt_get_param_metadata(MYSQL_STMT *stmt)
 
 my_bool mthd_stmt_get_result_metadata(MYSQL_STMT *stmt)
 {
-  MYSQL_DATA *result;
   MA_MEM_ROOT *fields_ma_alloc_root= &((MADB_STMT_EXTENSION *)stmt->extension)->fields_ma_alloc_root;
+  uint count= stmt->field_count;
 
-  if (!(result= stmt->mysql->methods->db_read_rows(stmt->mysql, (MYSQL_FIELD *)0,
-                                                   7 + ma_extended_type_info_rows(stmt->mysql))))
-    return(1);
-  if (!(stmt->fields= unpack_fields(stmt->mysql, result, fields_ma_alloc_root,
-          stmt->field_count, 0)))
+  if (!(stmt->fields= ma_read_fields(stmt->mysql, fields_ma_alloc_root,
+                                     &count, 0)))
     return(1);
   return(0);
 }
