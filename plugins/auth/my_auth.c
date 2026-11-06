@@ -794,6 +794,7 @@ int run_plugin_auth(MYSQL *mysql, char *data, uint data_len,
   size_t        ssl_info_client_len= 2;
   char          *ssl_info= NULL;
   unsigned char *ssl_info_client= NULL;
+  my_bool        verified;
   ulong          pkt_length;
   int            res;
 
@@ -945,6 +946,12 @@ retry:
   if (!mysql->net.tls_verify_status && !ssl_info_client)
     return 0;
 
+  /* the TLS layer has verified the server certificate */
+  verified= !mysql->net.tls_verify_status &&
+            (!mysql->options.extension->tls_allow_invalid_server_cert ||
+             mysql->options.extension->tls_fp ||
+             mysql->options.extension->tls_fp_list);
+
   if (mysql->net.tls_verify_status)
   {
     assert(mysql->options.use_ssl);
@@ -969,10 +976,7 @@ retry:
     char binding[128];
     size_t pwhash_len= sizeof(pwhash) - 1, binding_len;
 
-    if (!mysql->net.tls_verify_status &&
-        (!mysql->options.extension->tls_allow_invalid_server_cert ||
-         mysql->options.extension->tls_fp ||
-         mysql->options.extension->tls_fp_list))
+    if (verified)
     {
       binding_len= sizeof(ca) - 1;
       memcpy(binding, ca, binding_len);
@@ -1019,6 +1023,15 @@ retry:
         return 1;
       ssl_info_client_len+= MA_SHA256_HASH_SIZE;
     }
+  }
+  else if (!verified)
+  {
+    /*
+      Without a password hash the client can only vouch for the certificate:
+      ssl_info_client is COM_QUIT and the version if the client has verified
+      the certificate, and COM_QUIT alone if it has not.
+    */
+    ssl_info_client_len= 1;
   }
 
   if (ssl_info)
