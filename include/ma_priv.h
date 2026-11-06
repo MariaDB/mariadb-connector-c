@@ -24,9 +24,11 @@
 
 void free_rows(MYSQL_DATA *cur);
 int ma_multi_command(MYSQL *mysql, enum enum_multi_status status);
-MYSQL_FIELD * unpack_fields(const MYSQL *mysql, MYSQL_DATA *data,
-                            MA_MEM_ROOT *alloc,uint fields,
-                            my_bool default_value);
+MYSQL_FIELD *ma_read_fields(MYSQL *mysql, MA_MEM_ROOT *alloc,
+                            uint *field_count, my_bool default_value);
+int ma_unpack_field(MA_MEM_ROOT *alloc, uchar *pos, ulong pkt_len,
+                    MYSQL_FIELD *field, my_bool ext_info,
+                    my_bool default_value);
 
 static inline my_bool ma_has_extended_type_info(const MYSQL *mysql)
 {
